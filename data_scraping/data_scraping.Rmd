@@ -1,0 +1,209 @@
+---
+title: "Fantasy Baseball Research"
+author: "Declan"
+date: "2024-04-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(httr)
+library(urltools)
+library(tidyverse)
+library(purrr)
+```
+
+
+## Getting the DFS data
+
+```{r}
+data2015 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2015.pl", delim=":")
+data2016 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2016.pl", delim=":")
+data2017 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2017.pl", delim=":")
+data2018 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2018.pl", delim=":")
+data2019 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2019.pl", delim=":")
+data2020 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2020.pl", delim=":")
+data2021 = read_delim("http://rotoguru1.com/cgi-bin/mlb-dbd-2021.pl", delim=":")
+```
+
+```{r}
+data2016
+```
+
+
+
+
+```{r}
+url = "http://rotoguru1.com/cgi-bin/byday.pl?game=fd&month=4&day=10&year=2021"
+user_agent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36"
+  resp = GET(url, user_agent(user_agent))
+```
+
+```{r}
+library(rvest)
+resp = read_html(url)
+
+html_table(resp)
+
+```
+
+```{r}
+url = "http://rotoguru1.com/cgi-bin/byday.pl?date=910&game=fd&year=2020&scsv=1"
+
+resp = read_html(url)
+t = html_nodes(resp, "table") %>%
+  html_nodes("table")
+a = t[6] %>% html_table()
+a = a[[1]]
+
+a$X3 %>% read_delim(delim = ";")
+
+
+```
+
+```{r}
+scrape_roto_guru = function(day, month, year, website) {
+  
+  url = "http://rotoguru1.com/cgi-bin/byday.pl?" %>% 
+    param_set("game", website) %>%
+    param_set("date", paste0(day, month)) %>%
+    param_set("year", year) %>%
+    param_set("scsv", 1)
+  
+  resp = read_html(url)
+  t_html = html_nodes(resp, "table") %>%
+    html_nodes("table")
+  
+  t_html = t_html[6] %>% html_table()
+  
+  return(t_html[[1]]$X1[1] %>% read_delim(delim = ";"))
+}
+
+scrape_roto_guru(9, 11, 2019, "fd")
+
+
+website = "fd"
+day = 9
+month = 11
+year = 2019
+```
+
+```{r}
+url = "http://rotoguru1.com/cgi-bin/byday.pl?date=912&game=fd&year=2014"
+
+resp = read_html(url)
+t_html = html_nodes(resp, "table") %>%
+  html_nodes("table")
+
+a = t_html[7] %>% html_table()
+a = a[[1]]
+
+a[,1]
+
+positions = c("P", "2", "3", "4", "5", "6", "7", "8", "9")
+
+a = a %>%
+  set_names(c("Position", "Name", "Points", "Salary", "Team", "Opp", "Score", "Stats_Summary", "NA")) %>%
+  filter()
+  filter(row_number() != 1) 
+  
+a$Position %>% unique()
+
+
+```
+
+```{r warning=FALSE}
+scrape_roto_guru_day = function(day, month, year, website) {
+  
+  url = "http://rotoguru1.com/cgi-bin/byday.pl?" %>% 
+    param_set("game", website) %>%
+    param_set("day", day) %>%
+    param_set("month", month) %>%
+    param_set("year", year)
+  
+  resp = read_html(url)
+  t_html = html_nodes(resp, "table") %>%
+    html_nodes("table")
+  
+  # If you are reading this code sorry! Shit gross af but R making me want to kms
+  if (t_html %>% length() < 7) {
+    return(NA)
+  }
+  
+  table = t_html[7] %>% html_table()
+  
+  if (is_empty(table)) {
+    return(NA)
+  }
+  
+  table = table[[1]]
+  
+  names = c("Position", "Name", "Points", "Salary", "Team", "Opp", "Score", "Stats_Summary", "NA")
+  table = table %>%
+    set_names(names) %>%
+    mutate(Position = if_else(Position == "P", 1, as.numeric(Position))) %>%
+    mutate(day = day,
+           month = month,
+           year = year,
+           company = website) %>%
+    filter(!is.na(Position)) %>%
+    select(-c("NA"))
+  
+  if (nrow(table) == 0) {
+    return(NA)
+  }
+  
+  return(table)
+}
+
+scrape_roto_guru_year = function(company, year) {
+  days = 1:31
+  months = 3:11
+
+  names = c("Position", "Name", "Points", "Salary", "Team", "Opp", "Score", "Stats_Summary")
+  df = data.frame(matrix(nrow = 0, ncol = 8))
+  colnames(df) = names
+    
+  for (month in months) {
+    print(paste(month, year))
+    
+    for (day in days) {
+      print(day)
+      day_df = scrape_roto_guru_day(day, month, year, company)
+      if (!is.na(day_df)) {
+        df = rbind(df, day_df)
+      }
+    }
+  }
+  
+  return(df)
+}
+
+
+dk_df = scrape_roto_guru_year("dk", 2014)
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2015))
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2016))
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2017))
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2018))
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2019))
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2020))
+dk_df = rbind(dk_df, scrape_roto_guru_year("dk", 2021))
+
+scrape_roto_guru_day(14, 4, 2020, "dk")
+
+dk_df %>% filter(year == 2020)
+
+
+fd_df = scrape_roto_guru_company("fd")
+yh_df = scrape_roto_guru_company("yh")
+```
+
+
+```{r}
+
+```
+

@@ -1,0 +1,91 @@
+---
+title: "Getting daily baseball data"
+author: "Declan"
+date: "2024-04-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(baseballr)
+library(tidyverse)
+```
+
+```{r}
+get_dates = function(start, end) {
+  
+  dates = seq(as.Date(start), as.Date(end), by="days")
+  
+  return(as.character(dates))
+}
+
+get_statcast_data = function(dates, hitter=TRUE) {
+  
+  n_queries = ceiling(length(dates) / 5)
+  n = length(dates)
+  df = NULL
+  for (i in 0:(n_queries - 1)) {
+    first = i * 5 + 1
+    last = (i + 1) * 5
+    
+    if (last > n) {
+      last = n
+    }
+    
+    first_date = dates[first]
+    last_date = dates[last]
+    
+    print(first_date)
+    if (hitter) {
+      statcast = statcast_search_batters(start_date = first_date,
+                                         end_date = last_date)
+    } else {
+      statcast = statcast_search_pitchers(start_date = first_date,
+                                          end_date = last_date)
+    }
+    df = rbind(df, statcast)
+  
+  }
+  
+  return(df)
+}
+
+
+load_and_save_statcast = function(year) {
+  
+  dates = get_dates(first_day, last_day)
+  
+  hitter = get_statcast_data(dates, TRUE)
+  pitcher = get_statcast_data(dates, FALSE)
+  
+  hitter_file = paste("hitter_statcast_", year, ".rdata")
+  save(hitter, file = hitter_file)
+  
+  pitcher_file = paste("pitcher_statcast_", year, ".rdata")
+  save(pitcher, file = pitcher_file)
+}
+
+load_and_save_statcast(2015)
+load_and_save_statcast(2016)
+load_and_save_statcast(2017)
+load_and_save_statcast(2018)
+load_and_save_statcast(2019)
+load_and_save_statcast(2020)
+load_and_save_statcast(2021)
+```
+
+
+```{r}
+load("hitter_statcast_2015.rdata")
+```
+
+
+```{r}
+head(hitter)
+```
+
+

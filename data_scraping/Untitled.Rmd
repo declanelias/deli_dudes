@@ -1,0 +1,227 @@
+---
+title: "Analysis"
+author: "Declan"
+date: "2024-04-17"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(dplyr)
+library(tidyverse)
+```
+
+
+```{r}
+load("dk_df.rdata")
+load("fd_df.rdata")
+load("yh_df.rdata")
+```
+
+```{r}
+extract_stat = function(string, pattern1, pattern2) {
+  
+  stat = str_extract(string, pattern1)
+  
+  if_else(is.na(stat), 
+          as.numeric(grepl(pattern2, string)),
+          as.numeric(stat))
+}
+
+
+
+extract_hits = function(string) {
+  hits = str_extract(string, "\\d+(?=/)")
+  if_else(is.na(hits), 0, as.numeric(hits))
+}
+
+extract_at_bats = function(string) {
+  abs = str_extract(string, "(?<=/)\\d+")
+  if_else(is.na(abs), 0, as.numeric(abs))
+}
+
+extract_runs = function(string) {
+  pattern = "\\d+(?=R(\\s|$))"
+  extract_stat(string, pattern, "R(\\s|$)")
+}
+
+extract_rbis = function(string) {
+  pattern = "\\d+(?=RBI(\\s|$))"
+  extract_stat(string, pattern, "RBI(\\s|$)")
+}
+
+extract_2b = function(string) {
+  pattern = "\\d+(?=(-?)2B(\\s|$))"
+  extract_stat(string, pattern, "2B(\\s|$)")
+}
+
+extract_3b = function(string) {
+  pattern = "\\d+(?=(-?)3B(\\s|$))"
+  extract_stat(string, pattern, "3B(\\s|$)")
+}
+
+extract_hr = function(string) {
+  pattern = "\\d+(?=(-?)HR(\\s|$))"
+  extract_stat(string, pattern, "HR(\\s|$)")
+}
+
+extract_bb = function(string) {
+  pattern = "\\d+(?=(BB)(\\s|$))"
+  extract_stat(string, pattern, "BB(\\s|$)")
+}
+
+extract_so = function(string) {
+  pattern = "\\d+(?=(SO)(\\s|$))"
+  extract_stat(string, pattern, "SO(\\s|$)")
+}
+
+extract_sb = function(string) {
+  pattern = "\\d+(?=(SB)(\\s|$))"
+  extract_stat(string, pattern, "SB(\\s|$)")
+}
+
+extract_e = function(string) {
+  pattern = "\\d+(?=(E)(\\s|$))"
+  extract_stat(string, pattern, "E(\\s|$)")
+}
+
+extract_hbp = function(string) {
+  pattern = "\\d+(?=(HBP)(\\s|$))"
+  extract_stat(string, pattern, "HBP(\\s|$)")
+}
+
+extract_sf = function(string) {
+  pattern = "\\d+(?=(SF)(\\s|$))"
+  extract_stat(string, pattern, "SF(\\s|$)")
+}
+
+extract_s = function(string) {
+  pattern = "\\d+(?=(S)(\\s|$))"
+  extract_stat(string, pattern, "S(\\s|$)")
+}
+
+extract_cs = function(string) {
+  pattern = "\\d+(?=(CS)(\\s|$))"
+  extract_stat(string, pattern, "CS(\\s|$)")
+}
+
+extract_po = function(string) {
+  pattern = "\\d+(?=(PO)(\\s|$))"
+  extract_stat(string, pattern, "PO(\\s|$)")
+}
+
+parse_hit_stat_summary = function(df) {
+  df %>%
+    filter(Position != 1) %>%
+    mutate(hits = extract_hits(Stats_Summary),
+           abs = extract_at_bats(Stats_Summary),
+           runs = extract_runs(Stats_Summary),
+           rbis = extract_rbis(Stats_Summary),
+           doubles = extract_2b(Stats_Summary),
+           triples = extract_3b(Stats_Summary),
+           hrs = extract_hr(Stats_Summary),
+           bbs = extract_bb(Stats_Summary),
+           so = extract_so(Stats_Summary),
+           sb = extract_sb(Stats_Summary),
+           e = extract_e(Stats_Summary),
+           hbp = extract_hbp(Stats_Summary),
+           sf = extract_sf(Stats_Summary),
+           sac_bunts = extract_s(Stats_Summary),
+           cs = extract_cs(Stats_Summary),
+           po = extract_po(Stats_Summary),
+           order = if_else(str_detect(Name, "\\^\\d+$"),
+                           str_extract(Name, "\\d+$"),
+                           "PH"),
+           Name = str_extract(Name, "^[^\\^]+"))
+}
+```
+
+```{r}
+extract_ip = function(string) {
+  pattern = "(\\d+)(.\\d)?(?=IP(\\s|$))"
+  extract_stat(string, pattern, "IP")
+}
+
+extract_h = function(string) {
+  pattern = "\\d+(?=H(\\s|$))"
+  extract_stat(string, pattern, "H(\\s|$)")
+}
+
+extract_k = function(string) {
+  pattern = "\\d+(?=K(\\s|$))"
+  extract_stat(string, pattern, "K(\\s|$)")
+}
+
+extract_po = function(string) {
+  pattern = "\\d+(?=PO(\\s|$))"
+  extract_stat(string, pattern, "PO(\\s|$)")
+}
+
+extract_r = function(string) {
+  pattern = "\\d+(?=R(\\s|$))"
+  extract_stat(string, pattern, "R(\\s|$)")
+}
+
+extract_er = function(string) {
+  pattern = "\\d+(?=ER(\\s|$))"
+  extract_stat(string, pattern, "ER(\\s|$)")
+}
+
+extract_hb = function(string) {
+  pattern = "\\d+(?=HB(\\s|$))"
+  extract_stat(string, pattern, "HB(\\s|$)")
+}
+
+parse_pitch_stat_summary = function(df) {
+  df %>%
+    filter(Position == 1) %>%
+    mutate(IP = extract_ip(Stats_Summary),
+           H = extract_h(Stats_Summary),
+           bb = extract_bb(Stats_Summary),
+           K = extract_k(Stats_Summary),
+           win = str_detect(Stats_Summary, "Win"),
+           loss = str_detect(Stats_Summary, "Loss"), 
+           save = str_detect(Stats_Summary, "Save"),
+           hold = str_detect(Stats_Summary, "Hold"),
+           blown_save = str_detect(Stats_Summary, "BS"),
+           cg = str_detect(Stats_Summary, "CG"),
+           po = extract_po(Stats_Summary),
+           r = extract_r(Stats_Summary),
+           er = extract_er(Stats_Summary),
+           hb = extract_hb(Stats_Summary),
+           starter = str_detect(Name, "\\^\\d+$"),
+           Name = str_extract(Name, "^[^\\^]+"))
+}
+```
+
+```{r}
+fd_df = fd_df %>%
+  rename(fd_points = Points,
+         fd_salary = Salary) %>%
+  select(-c(company))
+
+dk_df = dk_df %>%
+  rename(dk_points = Points,
+         dk_salary = Salary) %>%
+  select(-c(company))
+
+yh_df = yh_df %>%
+  rename(yh_points = Points,
+         yh_salary = Salary) %>%
+  select(-c(company))
+
+dfs_baseball_df = left_join(dk_df, fd_df) %>%
+  left_join(yh_df)
+
+dfs_baseball_df = dfs_baseball_df %>% distinct()
+hitters_df = parse_hit_stat_summary(dfs_baseball_df)
+pitchers_df = parse_pitch_stat_summary(dfs_baseball_df)
+
+save(dfs_baseball_df, file = "dfs_baseball.rdata")
+save(hitters_df, file = "dfs_hitters.rdata")
+save(pitchers_df, file = "dfs_pitchers.rdata")
+```
+
